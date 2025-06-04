@@ -1,0 +1,36 @@
+name: Deploy Frontend
+
+on:
+  push:
+    branches: [ master ]  # Repository'nizin ana branch'ine göre main veya master yazın
+  workflow_dispatch:  # Manuel tetikleme için
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - uses: actions/checkout@v3
+    
+    - name: Set up Node.js
+      uses: actions/setup-node@v3
+      with:
+        node-version: '18'
+        
+    - name: Install Dependencies
+      run: npm ci
+      
+    - name: Build
+      run: npm run build
+      
+    - name: Set up SSH key
+      run: |
+        mkdir -p ~/.ssh
+        echo "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/id_ed25519
+        chmod 600 ~/.ssh/id_ed25519
+        ssh-keyscan -H ${{ secrets.FRONTEND_HOST }} >> ~/.ssh/known_hosts
+      
+    - name: Deploy to Frontend Server
+      run: |
+        ssh -i ~/.ssh/id_ed25519 root@${{ secrets.FRONTEND_HOST }} 'rm -rf /var/www/avtoforumapp/frontend/*'
+        scp -i ~/.ssh/id_ed25519 -r build/* root@${{ secrets.FRONTEND_HOST }}:/var/www/avtoforumapp/frontend/
